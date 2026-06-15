@@ -1,0 +1,12 @@
+{
+  "ticket_id": "CRA-001",
+  "title": "User authentication — login and protected route access",
+  "description": "As a user of the LTC Hackathon CRA application, I want to log in with my credentials and be redirected to the dashboard. Unauthenticated users should be redirected to the login page when they attempt to access protected routes. The frontend should persist the session across page refreshes using localStorage/sessionStorage.",
+  "acceptance_criteria": [
+    "Valid credentials allow the user to log in and reach the dashboard",
+    "Invalid credentials show an appropriate error message without crashing",
+    "Protected routes redirect unauthenticated users to /login",
+    "Session token is stored client-side and used in subsequent API requests",
+    "Logging out clears the session and redirects to the login page"
+  ]
+}

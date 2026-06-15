@@ -1,0 +1,5 @@
+chromadb
+gitpython
+langchain-text-splitters
+scikit-learn
+anthropic
