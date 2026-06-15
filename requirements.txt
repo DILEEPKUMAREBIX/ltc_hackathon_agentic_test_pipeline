@@ -3,3 +3,6 @@ gitpython
 langchain-text-splitters
 sentence-transformers
 anthropic
+fastapi
+uvicorn
+playwright
