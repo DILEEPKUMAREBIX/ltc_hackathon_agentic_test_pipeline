@@ -1,5 +1,5 @@
 chromadb
 gitpython
 langchain-text-splitters
-scikit-learn
+sentence-transformers
 anthropic

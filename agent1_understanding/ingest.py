@@ -13,37 +13,19 @@ Usage:
 import argparse
 import os
 import shutil
+import stat
 from pathlib import Path
 
+
+def _force_remove(func, path, _exc_info):
+    """Error handler for shutil.rmtree: clears read-only flag then retries (needed on Windows for .git files)."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
 import chromadb
-from chromadb import EmbeddingFunction, Documents, Embeddings
+from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
 from git import Repo
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sklearn.feature_extraction.text import HashingVectorizer
-
-# ---------------------------------------------------------------------------
-# Offline embedding function (no model download required)
-# ---------------------------------------------------------------------------
-# Chroma's default embedding function downloads an ONNX model from
-# HuggingFace, which can fail in network-restricted sandboxes. For the
-# hackathon prototype we use a deterministic hashing-based vectorizer
-# (scikit-learn) that runs fully offline. It captures lexical similarity
-# well enough for code/doc retrieval. Swap for OpenAI/Voyage/Anthropic
-# embeddings later for higher-quality semantic search.
-class HashingEmbeddingFunction(EmbeddingFunction):
-    def __init__(self, n_features: int = 1024):
-        self._vectorizer = HashingVectorizer(
-            n_features=n_features,
-            alternate_sign=False,
-            norm="l2",
-        )
-
-    def __call__(self, input: Documents) -> Embeddings:
-        vectors = self._vectorizer.transform(input)
-        return vectors.toarray().tolist()
-
-    def name(self) -> str:
-        return "hashing-vectorizer-1024"
 
 # ---------------------------------------------------------------------------
 # Config
@@ -81,7 +63,7 @@ def clone_repo(repo_url: str, force: bool = False) -> Path:
     dest = REPO_CACHE / repo_name
 
     if dest.exists() and force:
-        shutil.rmtree(dest)
+        shutil.rmtree(dest, onexc=_force_remove)
 
     if dest.exists():
         print(f"[ingest] Repo already cloned at {dest}, reusing.")
@@ -153,13 +135,12 @@ def chunk_files(files, root: Path):
 # ---------------------------------------------------------------------------
 def build_vector_store(docs, metadatas, ids, reset: bool = False):
     if reset and CHROMA_DIR.exists():
-        shutil.rmtree(CHROMA_DIR)
+        shutil.rmtree(CHROMA_DIR, onexc=_force_remove)
 
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
-    # Offline embedding — no model download, no API key needed.
-    embed_fn = HashingEmbeddingFunction()
+    embed_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
     # Recreate collection cleanly on each ingest run
     try:
@@ -190,7 +171,7 @@ def build_vector_store(docs, metadatas, ids, reset: bool = False):
 # ---------------------------------------------------------------------------
 def query(question: str, n_results: int = 5):
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    embed_fn = HashingEmbeddingFunction()
+    embed_fn = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
     collection = client.get_collection(COLLECTION_NAME, embedding_function=embed_fn)
 
     results = collection.query(query_texts=[question], n_results=n_results)

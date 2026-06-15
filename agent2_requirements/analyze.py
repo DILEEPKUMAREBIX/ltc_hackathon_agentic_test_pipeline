@@ -93,7 +93,7 @@ def analyze(ticket: dict, n_context: int = 5) -> list:
     client = anthropic.Anthropic()
     response = client.messages.create(
         model=MODEL,
-        max_tokens=4000,
+        max_tokens=8000,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -110,11 +110,21 @@ def analyze(ticket: dict, n_context: int = 5) -> list:
 
     try:
         scenarios = json.loads(text)
-    except json.JSONDecodeError as e:
-        print("[analyze] Failed to parse JSON from model output:", e)
-        print("--- raw output ---")
-        print(text)
-        raise
+    except json.JSONDecodeError:
+        # Response was cut off mid-JSON — recover by closing at the last complete object
+        last_brace = text.rfind("}")
+        if last_brace != -1:
+            repaired = text[: last_brace + 1] + "\n]"
+            try:
+                scenarios = json.loads(repaired)
+                print(f"[analyze] Warning: response was truncated; recovered {len(scenarios)} scenarios")
+            except json.JSONDecodeError as e:
+                print("[analyze] Failed to parse JSON from model output:", e)
+                print("--- raw output ---")
+                print(text)
+                raise
+        else:
+            raise
 
     return scenarios
 
